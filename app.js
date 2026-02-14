@@ -20,7 +20,7 @@ app.listen(port, () => console.log(`Server running on port ${port}`));
 
 //export models
 const User = require("./Models/User");
-
+const Product = require("./Models/Product")
 // routes
 //create user
 app.post("/api/register", async (req, res) => {
@@ -76,13 +76,13 @@ app.post("/api/login", async (req, res) => {
     if (!isMatch) {
       return res.status(400).json({ msg: "Invalid email or password" });
     }
-    const authCode=Buffer.from(user._id.toString()).toString("base64")
+    // const authCode = Buffer.from(user._id.toString()).toString("base64");
 
     res.json({
       success: true,
       msg: "Login successful",
       data: {
-        _id: authCode,
+        _id: user._id,
         username: user.username,
         email: user.email,
         role: user.role,
@@ -97,4 +97,37 @@ app.post("/api/login", async (req, res) => {
     });
   }
 });
+//route add product
+app.post("/api/product", async (req, res) => {
+  try {
+    const { userId, name, price, quantity, stock } = req.body;
 
+    if (!userId || !name || !price  || !stock) {
+      return res.status(400).json({ msg: "missing data" });
+    }
+
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ msg: "User not found" });
+    }
+
+    if (user.role !== "admin") {
+      return res.status(403).json({ msg: "Only admin can add product" });
+    }
+
+    const product = await Product.create({ name, price, quantity, stock });
+
+    res.status(201).json({
+      success: true,
+      msg: "Product added successfully",
+      data: product,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message,
+    });
+  }
+});
