@@ -20,7 +20,8 @@ app.listen(port, () => console.log(`Server running on port ${port}`));
 
 //export models
 const User = require("./Models/User");
-const Product = require("./Models/Product")
+const Product = require("./Models/Product");
+const Cart = require("./Models/Cart");
 // routes
 //create user
 app.post("/api/register", async (req, res) => {
@@ -97,12 +98,34 @@ app.post("/api/login", async (req, res) => {
     });
   }
 });
+//get all users
+app.get("/api/users", async (req, res) => {
+  try {
+    const users = await User.find();
+    if (!users) {
+      res.status(404).json({ msg: "users not found" });
+    }
+    const count = await User.countDocuments();
+    res.status(201).json({
+      success: true,
+      msg: "users fetched successfully",
+      totalUsers: count,
+      data: users,
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message,
+    });
+  }
+});
 //route add product
 app.post("/api/product", async (req, res) => {
   try {
     const { userId, name, price, quantity, stock } = req.body;
 
-    if (!userId || !name || !price  || !stock) {
+    if (!userId || !name || !price || !stock) {
       return res.status(400).json({ msg: "missing data" });
     }
 
@@ -121,6 +144,95 @@ app.post("/api/product", async (req, res) => {
       success: true,
       msg: "Product added successfully",
       data: product,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message,
+    });
+  }
+});
+//get products
+app.get("/api/product", async (req, res) => {
+  try {
+    const { name } = req.query; // use query for GET
+    const filter = {};
+
+    if (name) {
+      filter.name = { $regex: name, $options: "i" }; // partial & case-insensitive match
+    }
+
+    const products = await Product.find(filter);
+
+    if (products.length === 0) {
+      return res.status(404).json({ msg: "Products not found" });
+    }
+
+    res.status(200).json({
+      success: true,
+      totalProducts: products.length,
+      data: products,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message,
+    });
+  }
+});
+//post cart
+app.post("/api/cart", async (req, res) => {
+  try {
+    const { productId, quantity } = req.body;
+
+    if (!productId || !quantity) {
+      return res.status(400).json({ msg: "Missing productId or quantity" });
+    }
+     const product = await Product.findById(productId);
+     if (!product) {
+       return res.status(404).json({ msg: "Product not found" });
+     }
+
+     // Check if requested quantity is <= product quantity
+     if (quantity > product.quantity) {
+       return res.status(400).json({
+         msg: `Cannot add ${quantity}. Only ${product.quantity} left in stock.`,
+       });
+     }
+    const cart = await Cart.create({ productId,quantity });
+    res.status(201).json({
+      success: true,
+      msg: "product add successfully",
+      data: cart,
+    });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({
+      success: false,
+      msg: "Server error",
+      error: err.message,
+    });
+  }
+});
+
+app.get("/api/cart/:id", async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const cart = await Cart.findById(id).populate("productId", "name price");
+
+    if (!cart) {
+      return res.status(404).json({ msg: "Cart not found" });
+    }
+
+    res.json({
+      success: true,
+      msg: "Cart fetched successfully",
+      data: cart,
     });
   } catch (err) {
     console.log(err);
