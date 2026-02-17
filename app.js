@@ -243,3 +243,34 @@ app.get("/api/cart/:id", async (req, res) => {
     });
   }
 });
+//update cart
+app.put("/api/cart/:cartId/add", async (req, res) => {
+  try {
+    const { cartId } = req.params;
+    const { productId, quantity } = req.body;
+
+    // Find the cart
+    const cart = await Cart.findById(cartId);
+    if (!cart) return res.status(404).json({ msg: "Cart not found" });
+
+    // Check if product already exists in cart
+    const existingProduct = cart.products.find(
+      (item) => item.product.toString() === productId
+    );
+
+    if (existingProduct) {
+      // Update quantity if product exists
+      existingProduct.quantity += quantity || 1;
+    } else {
+      // Add new product
+      cart.products.push({ product: productId, quantity: quantity || 1 });
+    }
+
+    await cart.save();
+
+    res.status(200).json({ success: true, data: cart });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, msg: "Server error" });
+  }
+});
