@@ -184,46 +184,15 @@ app.get("/api/product", async (req, res) => {
     });
   }
 });
-//post cart
-app.post("/api/cart", async (req, res) => {
+
+
+app.get("/api/cart/:userId", async (req, res) => {
   try {
-    const { productId, quantity } = req.body;
-
-    if (!productId || !quantity) {
-      return res.status(400).json({ msg: "Missing productId or quantity" });
-    }
-     const product = await Product.findById(productId);
-     if (!product) {
-       return res.status(404).json({ msg: "Product not found" });
-     }
-
-     // Check if requested quantity is <= product quantity
-     if (quantity > product.quantity) {
-       return res.status(400).json({
-         msg: `Cannot add ${quantity}. Only ${product.quantity} left in stock.`,
-       });
-     }
-    const cart = await Cart.create({ productId,quantity });
-    res.status(201).json({
-      success: true,
-      msg: "product add successfully",
-      data: cart,
-    });
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({
-      success: false,
-      msg: "Server error",
-      error: err.message,
-    });
-  }
-});
-
-app.get("/api/cart/:id", async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    const cart = await Cart.findById(id).populate("productId", "name price");
+        const { userId } = req.params;
+    const cart = await Cart.findOne({ userId }).populate(
+      "products.productId",
+      "name price ",
+    );
 
     if (!cart) {
       return res.status(404).json({ msg: "Cart not found" });
@@ -244,33 +213,44 @@ app.get("/api/cart/:id", async (req, res) => {
   }
 });
 //update cart
-app.put("/api/cart/:cartId/add", async (req, res) => {
+app.put("/api/cart/:userId/add", async (req, res) => {
   try {
-    const { cartId } = req.params;
+    const { userId } = req.params;
     const { productId, quantity } = req.body;
+    
 
-    // Find the cart
-    const cart = await Cart.findById(cartId);
-    if (!cart) return res.status(404).json({ msg: "Cart not found" });
+    // Find product
+    const product = await Product.findById(productId);
+    if (!product) return res.status(404).json({ msg: "Product not found" });
+//if product out of the stock
+if(product.stock=="out of the stock"){
+  return res.status(400).json({msg:`the product : ${product.name} is out of the stock `})
+}
+    // Find or create cart
+    let cart = await Cart.findOne({ userId });
+    if (!cart) cart = new Cart({ userId, products: [] });
 
-    // Check if product already exists in cart
+    // Find existing product in cart
     const existingProduct = cart.products.find(
-      (item) => item.product.toString() === productId
+      (item) => item.productId.toString() === productId,
     );
-
-    if (existingProduct) {
-      // Update quantity if product exists
-      existingProduct.quantity += quantity || 1;
-    } else {
-      // Add new product
-      cart.products.push({ product: productId, quantity: quantity || 1 });
+    
+    // Check stock
+    const qtyToAdd = quantity || 1;
+    const currentQty = existingProduct ? existingProduct.quantity : 0;
+    if (currentQty + qtyToAdd > product.quantity) {
+      return res.status(400).json({
+        msg: `Cannot add ${qtyToAdd}. Only ${product.quantity - currentQty} left in stock.`,
+      });
     }
 
-    await cart.save();
+    // Add or update product and quantity
+    if (existingProduct) existingProduct.quantity += qtyToAdd;
+    else cart.products.push({ productId, quantity: qtyToAdd });
 
-    res.status(200).json({ success: true, data: cart });
+    await cart.save();
+    res.json({ success: true, msg: "Product added", data: cart });
   } catch (err) {
-    console.error(err);
     res.status(500).json({ success: false, msg: "Server error" });
   }
 });
