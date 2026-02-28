@@ -1,10 +1,11 @@
 const Product = require("../Models/Product");
-const User=require("../Models/User")
+const User = require("../Models/User");
 const addProduct = async (req, res) => {
   try {
-    const { userId, name, price, quantity, stock } = req.body;
+    const userId = req.user.id;
+    const { name, price, stock } = req.body;
 
-    if (!userId || !name || !price || !stock) {
+    if (!name || !price || !stock) {
       return res.status(400).json({ msg: "missing data" });
     }
 
@@ -17,7 +18,7 @@ const addProduct = async (req, res) => {
       return res.status(403).json({ msg: "Only admin can add product" });
     }
 
-    const product = await Product.create({ name, price, quantity, stock });
+    const product = await Product.create({ name, price, stock });
 
     res.status(201).json({
       success: true,
@@ -33,7 +34,7 @@ const addProduct = async (req, res) => {
     });
   }
 };
-const allProducts=async (req, res) => {
+const allProducts = async (req, res) => {
   try {
     const { name } = req.query; // use query for GET
     const filter = {};
@@ -61,8 +62,46 @@ const allProducts=async (req, res) => {
       error: err.message,
     });
   }
-}
-module.exports={
-    addProduct,
-    allProducts
-}
+};
+
+const updateProductPrice = async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { newPrice } = req.body;
+
+    // missing await
+    const product = await Product.findById(id);
+    if (!product) {
+      return res.status(404).json({ message: "Product not found" });
+    }
+
+    // missing defined discountPrice before if
+    let discountPrice;
+    if (newPrice > 1000) {
+      discountPrice = newPrice * 0.9;
+    }
+
+    // define priceToUpdate using discountPrice if exists, else newPrice
+    const priceToUpdate = discountPrice || newPrice;
+
+    // update product price
+    const updatedProduct = await Product.findByIdAndUpdate(
+      id,
+      { price: priceToUpdate },
+      { new: true }, // return the updated document
+    );
+
+    res.status(200).json({
+      success: true,
+      data: updatedProduct,
+    });
+  } catch (error) {
+    res.status(500).json({ success: false, message: error.message });
+  }
+};
+
+module.exports = {
+  addProduct,
+  allProducts,
+  updateProductPrice,
+};
