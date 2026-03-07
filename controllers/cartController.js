@@ -7,64 +7,37 @@ const addtoCart = async (req, res) => {
     const userId = req.user.id;
     const { productId, quantity } = req.body;
 
-    // Validate quantity
-    const qtyToAdd = parseInt(quantity);
 
-    if (!qtyToAdd || qtyToAdd <= 0) {
-      return res.status(400).json({
-        success: false,
-        msg: "Quantity must be a positive number",
-      });
-    }
-
-    // Find product
+    // Find the product
     const product = await Product.findById(productId);
     if (!product)
-      return res.status(404).json({
-        success: false,
-        msg: "Product not found",
-      });
+      return res.status(404).json({ success: false, msg: "Product not found" });
 
-    if (product.stock <= 0)
-      return res.status(400).json({
-        success: false,
-        msg: `The product ${product.name} is out of stock`,
-      });
+    if (product.stock < quantity)
+      return res
+        .status(400)
+        .json({ success: false, msg: `Only ${product.stock} left in stock` });
 
     // Find or create cart
     let cart = await Cart.findOne({ userId });
     if (!cart) cart = new Cart({ userId, products: [] });
 
-    const existingProduct = cart.products.find(
-      (item) => item.productId.toString() === productId,
+    // Find if product already in cart
+    const index = cart.products.findIndex((item) =>
+      item.productId.equals(productId),
     );
 
-    const currentQty = existingProduct ? existingProduct.quantity : 0;
-
-    // Prevent exceeding stock
-    if (currentQty >= product.stock) {
-      return res.status(400).json({
-        success: false,
-        msg: `No more ${product.name} available in stock.`,
-      });
-    }
-
-    if (currentQty + qtyToAdd > product.stock) {
-      return res.status(400).json({
-        success: false,
-        msg: `Cannot add ${qtyToAdd}. Only ${
-          product.stock - currentQty
-        } left in stock.`,
-      });
-    }
-
-    // Add or update product in cart
-    if (existingProduct) {
-      existingProduct.quantity += qtyToAdd;
+    if (index > -1) {
+      // Update quantity
+      cart.products[index].quantity += quantity;
     } else {
-      cart.products.push({ productId, quantity: qtyToAdd });
+      // Add new product to cart
+      cart.products.push({ productId, quantity });
     }
 
+    // Update product stock
+    product.stock -= quantity;
+    await product.save();
     await cart.save();
 
     res.json({
@@ -74,13 +47,11 @@ const addtoCart = async (req, res) => {
     });
   } catch (err) {
     console.log(err);
-    res.status(500).json({
-      success: false,
-      msg: "Server error",
-    });
+    res
+      .status(500)
+      .json({ success: false, msg: `Server error: ${err.message}` });
   }
 };
-
 
 const getCart = async (req, res) => {
   try {
@@ -111,7 +82,6 @@ const getCart = async (req, res) => {
     });
   }
 };
-
 
 const deleteFromCart = async (req, res) => {
   try {
@@ -153,7 +123,6 @@ const deleteFromCart = async (req, res) => {
     });
   }
 };
-
 
 const deleteCart = async (req, res) => {
   try {

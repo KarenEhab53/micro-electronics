@@ -1,10 +1,14 @@
 const User = require("../Models/User");
 const bcrypt = require("bcrypt");
 const jwt = require('jsonwebtoken');
+const registerSchema = require("./Validation/registerSchema");
 const createUser = async (req, res) => {
   try {
     //get data
-    const { username, email, password, role } = req.body;
+    const {} = registerSchema.validate(req.body,{
+abortEarly:false,
+stripUnknown:true
+    })
     // validate data
     if (!username || !email || !password) {
       return res.status(400).json({ msg: "missed data" });
