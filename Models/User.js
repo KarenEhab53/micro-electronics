@@ -1,3 +1,4 @@
+const { string } = require("joi");
 const mongoose = require("mongoose");
 const userSchema = new mongoose.Schema(
   {
@@ -23,6 +24,9 @@ const userSchema = new mongoose.Schema(
         enum:["admin","user"],
         default:"user",
     },
+    profileImage:{
+      type:String
+    }
   },
   { timestamps: true },
 );

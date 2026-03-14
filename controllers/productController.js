@@ -1,13 +1,17 @@
 const Product = require("../Models/Product");
 const User = require("../Models/User");
+const {
+  addProductSchema,
+} = require("../controllers/Validation/productValidation");
 const addProduct = async (req, res) => {
   try {
+      const { error, value } = addProductSchema.validate(req.body, {
+        abortEarly: false,
+        stripUnknown: true,
+      });
     const userId = req.user.id;
-    const { name, price, stock } = req.body;
-
-    if (!name || !price || !stock) {
-      return res.status(400).json({ msg: "missing data" });
-    }
+    const { name, price, stock } = value;
+    if (!req.file) return res.status(400).json({ msg: "please add product image" });
 
     const user = await User.findById(userId);
     if (!user) {
@@ -17,8 +21,10 @@ const addProduct = async (req, res) => {
     if (user.role !== "admin") {
       return res.status(403).json({ msg: "Only admin can add product" });
     }
-
-    const product = await Product.create({ name, price, stock });
+    // return console.log(req.file.path);
+    
+    value.image = req.file.path;
+    const product = await Product.create(value);
 
     res.status(201).json({
       success: true,
